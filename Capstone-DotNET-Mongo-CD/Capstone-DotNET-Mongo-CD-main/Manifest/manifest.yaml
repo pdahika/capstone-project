@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: noteapp-sa
+  namespace: webapps
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dotnet-noteapp
+  namespace: webapps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dotnet-noteapp
+  template:
+    metadata:
+      labels:
+        app: dotnet-noteapp
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "noteapp"
+        vault.hashicorp.com/agent-inject-secret-mongodb__connectionstring: "secret/data/noteapp"
+        vault.hashicorp.com/agent-inject-template-mongodb__connectionstring: |
+          {{- with secret "secret/data/noteapp" -}}
+          {{ .Data.data.mongodb__connectionstring }}
+          {{- end }}
+    spec:
+      serviceAccountName: noteapp-sa
+      containers:
+        - name: dotnet-noteapp
+          image: adijaiswal/noteapp:v6
+          ports:
+            - containerPort: 5050
+          env:
+            - name: DOTNET_ENVIRONMENT
+              value: Development
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dotnet-noteapp
+  namespace: webapps
+spec:
+  selector:
+    app: dotnet-noteapp
+  ports:
+    - port: 80
+      targetPort: 5050
+  type: ClusterIP
+
