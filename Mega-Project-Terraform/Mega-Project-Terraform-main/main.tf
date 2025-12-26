@@ -16,69 +16,69 @@ provider "aws" {
 # -------------------------------
 # VPC
 # -------------------------------
-resource "aws_vpc" "devopsshack_vpc" {
+resource "aws_vpc" "devopsshack1_vpc" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true
   enable_dns_hostnames = true
 
   tags = {
-    Name = "devopsshack-vpc"
+    Name = "devopsshack1-vpc"
   }
 }
 
 # -------------------------------
 # Subnets
 # -------------------------------
-resource "aws_subnet" "devopsshack_subnet" {
+resource "aws_subnet" "devopsshack1_subnet" {
   count                   = 2
-  vpc_id                  = aws_vpc.devopsshack_vpc.id
-  cidr_block              = cidrsubnet(aws_vpc.devopsshack_vpc.cidr_block, 8, count.index)
+  vpc_id                  = aws_vpc.devopsshack1_vpc.id
+  cidr_block              = cidrsubnet(aws_vpc.devopsshack1_vpc.cidr_block, 8, count.index)
   availability_zone       = element(["ap-south-1a", "ap-south-1b"], count.index)
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "devopsshack-subnet-${count.index}"
+    Name = "devopsshack1-subnet-${count.index}"
   }
 }
 
 # -------------------------------
 # Internet Gateway
 # -------------------------------
-resource "aws_internet_gateway" "devopsshack_igw" {
-  vpc_id = aws_vpc.devopsshack_vpc.id
+resource "aws_internet_gateway" "devopsshack1_igw" {
+  vpc_id = aws_vpc.devopsshack1_vpc.id
 
   tags = {
-    Name = "devopsshack-igw"
+    Name = "devopsshack1-igw"
   }
 }
 
 # -------------------------------
 # Route Table
 # -------------------------------
-resource "aws_route_table" "devopsshack_rt" {
-  vpc_id = aws_vpc.devopsshack_vpc.id
+resource "aws_route_table" "devopsshack1_rt" {
+  vpc_id = aws_vpc.devopsshack1_vpc.id
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.devopsshack_igw.id
+    gateway_id = aws_internet_gateway.devopsshack1_igw.id
   }
 
   tags = {
-    Name = "devopsshack-rt"
+    Name = "devopsshack1-rt"
   }
 }
 
-resource "aws_route_table_association" "devopsshack_assoc" {
-  count          = length(aws_subnet.devopsshack_subnet)
-  subnet_id      = aws_subnet.devopsshack_subnet[count.index].id
-  route_table_id = aws_route_table.devopsshack_rt.id
+resource "aws_route_table_association" "devopsshack1_assoc" {
+  count          = length(aws_subnet.devopsshack1_subnet)
+  subnet_id      = aws_subnet.devopsshack1_subnet[count.index].id
+  route_table_id = aws_route_table.devopsshack1_rt.id
 }
 
 # -------------------------------
 # EKS Cluster Role
 # -------------------------------
 resource "aws_iam_role" "eks_cluster_role" {
-  name = "devopsshack-cluster-role"
+  name = "devopsshack1-cluster-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
@@ -98,12 +98,12 @@ resource "aws_iam_role_policy_attachment" "cluster_AmazonEKSClusterPolicy" {
 # -------------------------------
 # EKS Cluster
 # -------------------------------
-resource "aws_eks_cluster" "devopsshack" {
-  name     = "devopsshack-cluster"
+resource "aws_eks_cluster" "devopsshack1" {
+  name     = "devopsshack1-cluster"
   role_arn = aws_iam_role.eks_cluster_role.arn
 
   vpc_config {
-    subnet_ids = aws_subnet.devopsshack_subnet[*].id
+    subnet_ids = aws_subnet.devopsshack1_subnet[*].id
   }
 
   version = "1.33"
@@ -115,7 +115,7 @@ resource "aws_eks_cluster" "devopsshack" {
 # Node Group Role
 # -------------------------------
 resource "aws_iam_role" "eks_node_role" {
-  name = "devopsshack-node-role"
+  name = "devopsshack1-node-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
@@ -145,11 +145,11 @@ resource "aws_iam_role_policy_attachment" "node_AmazonEC2ContainerRegistryReadOn
 # -------------------------------
 # Node Group
 # -------------------------------
-resource "aws_eks_node_group" "devopsshack_node_group" {
-  cluster_name    = aws_eks_cluster.devopsshack.name
-  node_group_name = "devopsshack-node-group"
+resource "aws_eks_node_group" "devopsshack1_node_group" {
+  cluster_name    = aws_eks_cluster.devopsshack1.name
+  node_group_name = "devopsshack1-node-group"
   node_role_arn   = aws_iam_role.eks_node_role.arn
-  subnet_ids      = aws_subnet.devopsshack_subnet[*].id
+  subnet_ids      = aws_subnet.devopsshack1_subnet[*].id
 
   scaling_config {
     desired_size = 2
@@ -161,7 +161,7 @@ resource "aws_eks_node_group" "devopsshack_node_group" {
   disk_size      = 20
 
   depends_on = [
-    aws_eks_cluster.devopsshack,
+    aws_eks_cluster.devopsshack1,
     aws_iam_role_policy_attachment.node_AmazonEKSWorkerNodePolicy,
     aws_iam_role_policy_attachment.node_AmazonEKS_CNI_Policy,
     aws_iam_role_policy_attachment.node_AmazonEC2ContainerRegistryReadOnly
@@ -172,11 +172,11 @@ resource "aws_eks_node_group" "devopsshack_node_group" {
 # EBS CSI Driver Add-on
 # -------------------------------
 resource "aws_eks_addon" "ebs_csi_driver" {
-  cluster_name             = aws_eks_cluster.devopsshack.name
+  cluster_name             = aws_eks_cluster.devopsshack1.name
   addon_name               = "aws-ebs-csi-driver"
   addon_version            = "v1.35.0-eksbuild.1" # ✅ Compatible with EKS 1.33
   resolve_conflicts_on_update = "OVERWRITE"
 
-  depends_on = [aws_eks_node_group.devopsshack_node_group]
+  depends_on = [aws_eks_node_group.devopsshack1_node_group]
 }
 
